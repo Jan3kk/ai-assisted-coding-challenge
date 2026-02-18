@@ -55,21 +55,17 @@ dotnet test
 
 ## Project Structure
 
+The solution follows a DDD-style layering: Domain (no dependencies) → Application → Infrastructure → Api.
+
 ```
 /
 ├── src/
-│   └── ExchangeRate.Core/           # Core library
-│       ├── Entities/                # Domain entities (ExchangeRate, PeggedCurrency, Country)
-│       ├── Enums/                   # Enumerations (CurrencyTypes, ExchangeRateSources, etc.)
-│       ├── Exceptions/              # Custom exception types
-│       ├── Helpers/                 # Utility classes (PeriodHelper, AsyncUtil)
-│       ├── Infrastructure/          # Data store interfaces
-│       ├── Interfaces/              # Core interfaces and provider contracts
-│       ├── Models/                  # Data transfer objects
-│       └── Providers/               # Exchange rate provider implementations
+│   ├── ExchangeRate.Domain/         # Domain layer: entities, value objects, enums, domain service, repository interfaces
+│   ├── ExchangeRate.Application/    # Application layer: use cases, IExchangeRateRepository facade, provider ports
+│   ├── ExchangeRate.Infrastructure/ # Infrastructure: repository implementations, provider factory, HTTP providers
+│   └── ExchangeRate.Api/            # Presentation: endpoints, DI composition, InMemoryExchangeRateDataStore
 ├── tests/
-│   └── ExchangeRate.Tests/          # Unit tests
-│       └── TestDoubles/             # Test infrastructure (in-memory data store)
+│   └── ExchangeRate.Tests/          # Integration tests
 └── ExchangeRateRefactoring.sln      # Solution file
 ```
 

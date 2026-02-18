@@ -1,19 +1,17 @@
-using ExchangeRate.Core.Infrastructure;
-using ExchangeRateEntity = ExchangeRate.Core.Entities.ExchangeRate;
-using PeggedCurrency = ExchangeRate.Core.Entities.PeggedCurrency;
+using ExchangeRate.Domain;
+using ExchangeRate.Domain.Entities;
 
 namespace ExchangeRate.Api.Infrastructure;
 
 /// <summary>
 /// In-memory implementation of IExchangeRateDataStore.
-/// Candidates can replace this with a real database implementation (e.g., EF Core).
 /// </summary>
 public class InMemoryExchangeRateDataStore : IExchangeRateDataStore
 {
-    private readonly List<ExchangeRateEntity> _exchangeRates = new();
+    private readonly List<ExchangeRate.Domain.Entities.ExchangeRate> _exchangeRates = new();
     private readonly List<PeggedCurrency> _peggedCurrencies = new();
 
-    public Task<List<ExchangeRateEntity>> GetExchangeRatesAsync(DateTime minDate, DateTime maxDate)
+    public Task<List<ExchangeRate.Domain.Entities.ExchangeRate>> GetExchangeRatesAsync(DateTime minDate, DateTime maxDate)
     {
         var rates = _exchangeRates
             .Where(r => r.Date >= minDate && r.Date < maxDate)
@@ -22,7 +20,7 @@ public class InMemoryExchangeRateDataStore : IExchangeRateDataStore
         return Task.FromResult(rates);
     }
 
-    public Task SaveExchangeRatesAsync(IEnumerable<ExchangeRateEntity> rates)
+    public Task SaveExchangeRatesAsync(IEnumerable<ExchangeRate.Domain.Entities.ExchangeRate> rates)
     {
         foreach (var rate in rates)
         {

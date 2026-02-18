@@ -27,8 +27,9 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\src\ExchangeRate.Core\ExchangeRate.Core.csproj" />
     <ProjectReference Include="..\..\src\ExchangeRate.Api\ExchangeRate.Api.csproj" />
+    <ProjectReference Include="..\..\src\ExchangeRate.Application\ExchangeRate.Application.csproj" />
+    <ProjectReference Include="..\..\src\ExchangeRate.Domain\ExchangeRate.Domain.csproj" />
   </ItemGroup>
 
 </Project>

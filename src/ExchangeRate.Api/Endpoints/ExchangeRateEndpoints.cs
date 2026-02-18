@@ -1,6 +1,6 @@
 using ExchangeRate.Api.Contracts.Responses;
-using ExchangeRate.Core.Enums;
-using ExchangeRate.Core.Interfaces;
+using ExchangeRate.Application;
+using ExchangeRate.Domain.Enums;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 

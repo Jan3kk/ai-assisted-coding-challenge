@@ -2,10 +2,10 @@
 using System.Net;
 using System.Net.Http.Json;
 using ExchangeRate.Api.Infrastructure;
-using ExchangeRate.Core.Entities;
-using ExchangeRate.Core.Enums;
-using ExchangeRate.Core.Infrastructure;
-using ExchangeRate.Core.Models;
+using ExchangeRate.Application.Configuration;
+using ExchangeRate.Domain;
+using ExchangeRate.Domain.Entities;
+using ExchangeRate.Domain.Enums;
 using FluentAssertions;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;

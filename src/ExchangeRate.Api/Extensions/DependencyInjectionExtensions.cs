@@ -1,9 +1,10 @@
-using ExchangeRate.Core;
-using ExchangeRate.Core.Infrastructure;
-using ExchangeRate.Core.Interfaces;
-using ExchangeRate.Core.Interfaces.Providers;
-using ExchangeRate.Core.Models;
-using ExchangeRate.Core.Providers;
+using ExchangeRate.Application;
+using ExchangeRate.Application.Configuration;
+using ExchangeRate.Application.Ports;
+using ExchangeRate.Domain;
+using ExchangeRate.Domain.Services;
+using ExchangeRate.Infrastructure.Persistence;
+using ExchangeRate.Infrastructure.Providers;
 using ExchangeRate.Api.Infrastructure;
 using Microsoft.Extensions.Options;
 
@@ -20,10 +21,8 @@ public static class DependencyInjectionExtensions
     public static IServiceCollection AddExchangeRateConfiguration(this IServiceCollection services, IConfiguration configuration)
     {
         services.Configure<ExternalExchangeRateApiConfig>(configuration.GetSection("ExchangeRateApi"));
-
         services.AddSingleton<ExternalExchangeRateApiConfig>(sp =>
             sp.GetRequiredService<IOptions<ExternalExchangeRateApiConfig>>().Value);
-
         return services;
     }
 
@@ -50,18 +49,19 @@ public static class DependencyInjectionExtensions
         });
 
         services.AddSingleton<IExchangeRateProviderFactory, ExchangeRateProviderFactory>();
-
         return services;
     }
 
     /// <summary>
-    /// Registers exchange rate infrastructure (data store, repository).
+    /// Registers exchange rate infrastructure and application (data store, repositories, facade).
     /// </summary>
     public static IServiceCollection AddExchangeRateInfrastructure(this IServiceCollection services)
     {
         services.AddSingleton<IExchangeRateDataStore, InMemoryExchangeRateDataStore>();
-        services.AddSingleton<IExchangeRateRepository, ExchangeRateRepository>();
-
+        services.AddSingleton<IStoredExchangeRateRepository, StoredExchangeRateRepository>();
+        services.AddSingleton<IPeggedCurrencyRepository, PeggedCurrencyRepository>();
+        services.AddSingleton<IRateQuoteService, RateQuoteService>();
+        services.AddSingleton<IExchangeRateRepository, ExchangeRateRepositoryFacade>();
         return services;
     }
 }
