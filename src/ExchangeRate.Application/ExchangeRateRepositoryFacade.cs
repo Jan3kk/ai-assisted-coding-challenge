@@ -2,7 +2,6 @@ using ExchangeRate.Domain;
 using ExchangeRate.Domain.Enums;
 using ExchangeRate.Domain.Errors;
 using ExchangeRate.Domain.Exceptions;
-using ExchangeRate.Domain.Helpers;
 using ExchangeRate.Domain.Services;
 using ExchangeRate.Application.Ports;
 using Microsoft.Extensions.Logging;
@@ -18,6 +17,7 @@ public sealed class ExchangeRateRepositoryFacade : IExchangeRateRepository
     private readonly IPeggedCurrencyRepository _peggedCurrencyRepository;
     private readonly IExchangeRateProviderFactory _providerFactory;
     private readonly IRateQuoteService _rateQuoteService;
+    private readonly IExchangeRateSynchronizer _synchronizer;
     private readonly ILogger<ExchangeRateRepositoryFacade>? _logger;
 
     static ExchangeRateRepositoryFacade()
@@ -31,12 +31,14 @@ public sealed class ExchangeRateRepositoryFacade : IExchangeRateRepository
         IPeggedCurrencyRepository peggedCurrencyRepository,
         IExchangeRateProviderFactory providerFactory,
         IRateQuoteService rateQuoteService,
+        IExchangeRateSynchronizer synchronizer,
         ILogger<ExchangeRateRepositoryFacade>? logger = null)
     {
         _storedRepository = storedRepository ?? throw new ArgumentNullException(nameof(storedRepository));
         _peggedCurrencyRepository = peggedCurrencyRepository ?? throw new ArgumentNullException(nameof(peggedCurrencyRepository));
         _providerFactory = providerFactory ?? throw new ArgumentNullException(nameof(providerFactory));
         _rateQuoteService = rateQuoteService ?? throw new ArgumentNullException(nameof(rateQuoteService));
+        _synchronizer = synchronizer ?? throw new ArgumentNullException(nameof(synchronizer));
         _logger = logger;
     }
 
@@ -48,7 +50,7 @@ public sealed class ExchangeRateRepositoryFacade : IExchangeRateRepository
             return 1m;
 
         date = date.Date;
-        await EnsureRatesLoadedAsync(date, source, frequency).ConfigureAwait(false);
+        await _synchronizer.EnsureRatesLoadedAsync(date, source, frequency).ConfigureAwait(false);
 
         if (fromCurrency != provider.Currency && toCurrency != provider.Currency)
         {
@@ -77,7 +79,7 @@ public sealed class ExchangeRateRepositoryFacade : IExchangeRateRepository
 
         if (result.Errors.FirstOrDefault() is NoFxRateFoundError)
         {
-            await FetchRatesForDateAsync(provider, date, source, frequency).ConfigureAwait(false);
+            await _synchronizer.EnsureRatesForDateAsync(date, source, frequency).ConfigureAwait(false);
 
             rates = await _storedRepository.GetAsync(DateTime.MinValue, DateTime.UtcNow.Date.AddDays(1), source, frequency).ConfigureAwait(false);
             (ratesByCurrencyAndDate, minFxDate) = BuildRateSurface(rates);
@@ -110,126 +112,10 @@ public sealed class ExchangeRateRepositoryFacade : IExchangeRateRepository
         return await GetRateAsync(fromCurrency, toCurrency, date, source, frequency).ConfigureAwait(false);
     }
 
-    public async Task UpdateRatesAsync()
-    {
-        foreach (var source in _providerFactory.ListExchangeRateSources())
-        {
-            try
-            {
-                var provider = _providerFactory.GetExchangeRateProvider(source);
-                var rates = await FetchLatestRatesAsync(provider).ConfigureAwait(false);
+    public Task UpdateRatesAsync() => _synchronizer.UpdateRatesAsync();
 
-                if (rates.Count > 0)
-                    await SaveFetchedRatesAsync(rates).ConfigureAwait(false);
-            }
-            catch (Exception ex)
-            {
-                _logger?.LogError(ex, "Failed to update rates for {Source}", source);
-            }
-        }
-    }
-
-    public async Task<bool> EnsureMinimumDateRangeAsync(DateTime minDate, IEnumerable<ExchangeRateSources>? exchangeRateSources = null)
-    {
-        var success = true;
-        foreach (var source in exchangeRateSources ?? _providerFactory.ListExchangeRateSources())
-        {
-            var provider = _providerFactory.GetExchangeRateProvider(source);
-
-            foreach (var f in GetSupportedFrequencies(provider))
-            {
-                if (!await EnsureMinimumDateRangeAsync(minDate, source, f).ConfigureAwait(false))
-                    success = false;
-            }
-        }
-        return success;
-    }
-
-    private async Task EnsureRatesLoadedAsync(DateTime date, ExchangeRateSources source, ExchangeRateFrequencies frequency)
-    {
-        var rates = await _storedRepository.GetAsync(DateTime.MinValue, DateTime.UtcNow.Date.AddDays(1), source, frequency).ConfigureAwait(false);
-        var minFxDate = rates.Count > 0 ? rates.Min(r => r.Date) : DateTime.MaxValue;
-
-        if (PeriodHelper.GetStartOfMonth(minFxDate) > date)
-            await EnsureMinimumDateRangeAsync(PeriodHelper.GetStartOfMonth(date.AddMonths(-1)), source, frequency).ConfigureAwait(false);
-    }
-
-    private async Task<bool> EnsureMinimumDateRangeAsync(DateTime minDate, ExchangeRateSources source, ExchangeRateFrequencies frequency)
-    {
-        minDate = PeriodHelper.GetStartOfMonth(minDate);
-
-        var rates = await _storedRepository.GetAsync(DateTime.MinValue, DateTime.UtcNow.Date.AddDays(1), source, frequency).ConfigureAwait(false);
-        var rawMinFxDate = rates.Count > 0 ? rates.Min(r => r.Date) : DateTime.MaxValue;
-
-        if (PeriodHelper.GetStartOfMonth(rawMinFxDate) <= minDate)
-            return true;
-
-        var provider = _providerFactory.GetExchangeRateProvider(source);
-        var fetchTo = rawMinFxDate == DateTime.MaxValue ? DateTime.UtcNow.Date : rawMinFxDate;
-        return await FetchAndSaveHistoricalRatesAsync(provider, minDate, fetchTo, source, frequency).ConfigureAwait(false);
-    }
-
-    private async Task FetchRatesForDateAsync(IExchangeRateProvider provider, DateTime date, ExchangeRateSources source, ExchangeRateFrequencies frequency)
-    {
-        await FetchAndSaveHistoricalRatesAsync(provider, date.AddDays(-7), date, source, frequency).ConfigureAwait(false);
-    }
-
-    private async Task<bool> FetchAndSaveHistoricalRatesAsync(IExchangeRateProvider provider, DateTime from, DateTime to, ExchangeRateSources source, ExchangeRateFrequencies frequency)
-    {
-        var actualFrom = from <= to ? from : to;
-        var actualTo = from <= to ? to : from;
-
-        var fetchedRates = await FetchHistoricalRatesAsync(provider, frequency, actualFrom, actualTo).ConfigureAwait(false);
-
-        if (fetchedRates.Count == 0)
-        {
-            _logger?.LogError(
-                "No historical data found between {From:yyyy-MM-dd} and {To:yyyy-MM-dd} for source {Source} with frequency {Frequency}.",
-                actualFrom, actualTo, source, frequency);
-            return false;
-        }
-
-        await SaveFetchedRatesAsync(fetchedRates).ConfigureAwait(false);
-        return true;
-    }
-
-    private async Task<List<ExchangeRateEntity>> FetchHistoricalRatesAsync(IExchangeRateProvider provider, ExchangeRateFrequencies frequency, DateTime from, DateTime to)
-    {
-        IEnumerable<ExchangeRateEntity> rates = frequency switch
-        {
-            ExchangeRateFrequencies.Daily when provider is IDailyExchangeRateProvider daily
-                => await daily.GetHistoricalDailyFxRatesAsync(from, to).ConfigureAwait(false),
-            ExchangeRateFrequencies.Monthly when provider is IMonthlyExchangeRateProvider monthly
-                => await monthly.GetHistoricalMonthlyFxRatesAsync(from, to).ConfigureAwait(false),
-            ExchangeRateFrequencies.Weekly when provider is IWeeklyExchangeRateProvider weekly
-                => await weekly.GetHistoricalWeeklyFxRatesAsync(from, to).ConfigureAwait(false),
-            ExchangeRateFrequencies.BiWeekly when provider is IBiWeeklyExchangeRateProvider biweekly
-                => await biweekly.GetHistoricalBiWeeklyFxRatesAsync(from, to).ConfigureAwait(false),
-            _ => throw new ExchangeRateException($"Provider {provider.Source} does not support frequency {frequency}")
-        };
-        return rates.ToList();
-    }
-
-    private static async Task<List<ExchangeRateEntity>> FetchLatestRatesAsync(IExchangeRateProvider provider)
-    {
-        var list = new List<ExchangeRateEntity>();
-
-        if (provider is IDailyExchangeRateProvider daily)
-            list.AddRange(await daily.GetDailyFxRatesAsync().ConfigureAwait(false));
-        if (provider is IMonthlyExchangeRateProvider monthly)
-            list.AddRange(await monthly.GetMonthlyFxRatesAsync().ConfigureAwait(false));
-        if (provider is IWeeklyExchangeRateProvider weekly)
-            list.AddRange(await weekly.GetWeeklyFxRatesAsync().ConfigureAwait(false));
-        if (provider is IBiWeeklyExchangeRateProvider biWeekly)
-            list.AddRange(await biWeekly.GetBiWeeklyFxRatesAsync().ConfigureAwait(false));
-
-        return list;
-    }
-
-    private async Task SaveFetchedRatesAsync(List<ExchangeRateEntity> rates)
-    {
-        await _storedRepository.SaveAsync(rates).ConfigureAwait(false);
-    }
+    public Task<bool> EnsureMinimumDateRangeAsync(DateTime minDate, IEnumerable<ExchangeRateSources>? exchangeRateSources = null) =>
+        _synchronizer.EnsureMinimumDateRangeAsync(minDate, exchangeRateSources);
 
     private static (IReadOnlyDictionary<CurrencyTypes, IReadOnlyDictionary<DateTime, decimal>> ratesByCurrencyAndDate, DateTime minFxDate) BuildRateSurface(IReadOnlyList<ExchangeRateEntity> rates)
     {
@@ -240,7 +126,7 @@ public sealed class ExchangeRateRepositoryFacade : IExchangeRateRepository
         {
             if (!byCurrencyAndDate.TryGetValue(r.CurrencyId, out var byDate))
                 byCurrencyAndDate[r.CurrencyId] = byDate = new Dictionary<DateTime, decimal>();
-            byDate[r.Date] = r.Rate;
+            byDate[r.Date] = r.Rate.Rounded;
             if (r.Date < minFxDate)
                 minFxDate = r.Date;
         }
@@ -260,13 +146,5 @@ public sealed class ExchangeRateRepositoryFacade : IExchangeRateRepository
             throw new ExchangeRateException("Not supported currency code: " + currencyCode);
 
         return currency;
-    }
-
-    private static IEnumerable<ExchangeRateFrequencies> GetSupportedFrequencies(IExchangeRateProvider provider)
-    {
-        if (provider is IDailyExchangeRateProvider) yield return ExchangeRateFrequencies.Daily;
-        if (provider is IMonthlyExchangeRateProvider) yield return ExchangeRateFrequencies.Monthly;
-        if (provider is IWeeklyExchangeRateProvider) yield return ExchangeRateFrequencies.Weekly;
-        if (provider is IBiWeeklyExchangeRateProvider) yield return ExchangeRateFrequencies.BiWeekly;
     }
 }

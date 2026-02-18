@@ -1,5 +1,6 @@
 using ExchangeRate.Domain;
 using ExchangeRate.Domain.Enums;
+using ExchangeRate.Domain.ValueObjects;
 using Microsoft.Extensions.Logging;
 using ExchangeRateEntity = ExchangeRate.Domain.Entities.ExchangeRate;
 
@@ -7,7 +8,7 @@ namespace ExchangeRate.Infrastructure.Persistence;
 
 public sealed class StoredExchangeRateRepository : IStoredExchangeRateRepository
 {
-    private readonly Dictionary<(ExchangeRateSources, ExchangeRateFrequencies), Dictionary<CurrencyTypes, Dictionary<DateTime, decimal>>> _rateCache = new();
+    private readonly Dictionary<(ExchangeRateSources, ExchangeRateFrequencies), Dictionary<CurrencyTypes, Dictionary<DateTime, RateValue>>> _rateCache = new();
     private Dictionary<(ExchangeRateSources, ExchangeRateFrequencies), DateTime> _minDateBySourceFrequency = new();
     private readonly IExchangeRateDataStore _dataStore;
     private readonly ILogger<StoredExchangeRateRepository>? _logger;
@@ -53,10 +54,10 @@ public sealed class StoredExchangeRateRepository : IStoredExchangeRateRepository
                     continue;
                 foreach (var (currency, byDate) in byCurrency)
                 {
-                    foreach (var (date, rate) in byDate)
+                    foreach (var (date, rateValue) in byDate)
                     {
                         if (date >= minDate && date < maxDate)
-                            result.Add(new ExchangeRateEntity { Date = date, CurrencyId = currency, Source = s, Frequency = f, Rate = rate });
+                            result.Add(new ExchangeRateEntity { Date = date, CurrencyId = currency, Source = s, Frequency = f, Rate = rateValue });
                     }
                 }
             }
@@ -105,19 +106,19 @@ public sealed class StoredExchangeRateRepository : IStoredExchangeRateRepository
         var newRate = item.Rate;
 
         if (!_rateCache.TryGetValue((source, frequency), out var byCurrency))
-            _rateCache[(source, frequency)] = byCurrency = new Dictionary<CurrencyTypes, Dictionary<DateTime, decimal>>();
+            _rateCache[(source, frequency)] = byCurrency = new Dictionary<CurrencyTypes, Dictionary<DateTime, RateValue>>();
 
         if (!byCurrency.TryGetValue(currency, out var byDate))
-            byCurrency[currency] = byDate = new Dictionary<DateTime, decimal>();
+            byCurrency[currency] = byDate = new Dictionary<DateTime, RateValue>();
 
         if (byDate.TryGetValue(date, out var savedRate))
         {
-            if (decimal.Round(newRate, ExchangeRateEntity.Precision) == decimal.Round(savedRate, ExchangeRateEntity.Precision))
+            if (newRate.Equals(savedRate))
                 return false;
 
             _logger?.LogWarning(
                 "Correcting exchange rate for {Currency} on {Date:yyyy-MM-dd}. Old: {SavedRate}, New: {NewRate}. Source: {Source}, Frequency: {Frequency}",
-                currency, date, savedRate, newRate, source, frequency);
+                currency, date, savedRate.Rounded, newRate.Rounded, source, frequency);
             byDate[date] = newRate;
             return true;
         }

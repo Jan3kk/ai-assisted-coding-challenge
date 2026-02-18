@@ -6,6 +6,7 @@ using ExchangeRate.Application.Configuration;
 using ExchangeRate.Application.Ports;
 using ExchangeRate.Domain.Entities;
 using ExchangeRate.Domain.Enums;
+using ExchangeRate.Domain.ValueObjects;
 
 namespace ExchangeRate.Infrastructure.Providers;
 
@@ -76,7 +77,7 @@ public abstract class ExternalApiExchangeRateProvider : IExchangeRateProvider
                 {
                     Date = date,
                     Frequency = frequency,
-                    Rate = rateDto.GetAbsoluteRate(),
+                    Rate = new RateValue(rateDto.GetAbsoluteRate()),
                     Source = source,
                     CurrencyId = CurrencyMapping[code]
                 };

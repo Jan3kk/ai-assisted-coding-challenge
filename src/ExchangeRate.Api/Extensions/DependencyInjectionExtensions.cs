@@ -61,6 +61,7 @@ public static class DependencyInjectionExtensions
         services.AddSingleton<IStoredExchangeRateRepository, StoredExchangeRateRepository>();
         services.AddSingleton<IPeggedCurrencyRepository, PeggedCurrencyRepository>();
         services.AddSingleton<IRateQuoteService, RateQuoteService>();
+        services.AddSingleton<IExchangeRateSynchronizer, ExchangeRateSynchronizer>();
         services.AddSingleton<IExchangeRateRepository, ExchangeRateRepositoryFacade>();
         return services;
     }

@@ -1,4 +1,5 @@
 using ExchangeRate.Domain.Enums;
+using ExchangeRate.Domain.ValueObjects;
 
 namespace ExchangeRate.Domain.Entities;
 
@@ -12,9 +13,7 @@ public record ExchangeRate
 
     public required ExchangeRateFrequencies Frequency { get; init; }
 
-    public required decimal Rate { get; set; }
+    public required RateValue Rate { get; init; }
 
-    public override string ToString() => $"{CurrencyId} - {Date:yyyy-MM-dd}: {Rate}";
-
-    public const int Precision = 10;
+    public override string ToString() => $"{CurrencyId} - {Date:yyyy-MM-dd}: {Rate.Rounded}";
 }
