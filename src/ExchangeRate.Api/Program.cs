@@ -22,27 +22,22 @@ builder.Services.AddSingleton<ExternalExchangeRateApiConfig>(sp =>
     };
 });
 
-// Register HttpClient for providers
 builder.Services.AddHttpClient<EUECBExchangeRateProvider>();
 builder.Services.AddHttpClient<MXCBExchangeRateProvider>();
 
-// Register all exchange rate providers - both as interface and concrete type
-// The factory resolves by concrete type, so we need both registrations
-builder.Services.AddSingleton<EUECBExchangeRateProvider>(sp =>
+builder.Services.AddSingleton<IExchangeRateProvider>(sp =>
 {
     var httpClient = sp.GetRequiredService<IHttpClientFactory>().CreateClient(nameof(EUECBExchangeRateProvider));
     var config = sp.GetRequiredService<ExternalExchangeRateApiConfig>();
     return new EUECBExchangeRateProvider(httpClient, config);
 });
-builder.Services.AddSingleton<IExchangeRateProvider>(sp => sp.GetRequiredService<EUECBExchangeRateProvider>());
 
-builder.Services.AddSingleton<MXCBExchangeRateProvider>(sp =>
+builder.Services.AddSingleton<IExchangeRateProvider>(sp =>
 {
     var httpClient = sp.GetRequiredService<IHttpClientFactory>().CreateClient(nameof(MXCBExchangeRateProvider));
     var config = sp.GetRequiredService<ExternalExchangeRateApiConfig>();
     return new MXCBExchangeRateProvider(httpClient, config);
 });
-builder.Services.AddSingleton<IExchangeRateProvider>(sp => sp.GetRequiredService<MXCBExchangeRateProvider>());
 
 // Register the provider factory
 builder.Services.AddSingleton<IExchangeRateProviderFactory, ExchangeRateProviderFactory>();
@@ -55,8 +50,7 @@ builder.Services.AddSingleton<IExchangeRateRepository, ExchangeRateRepository>()
 
 var app = builder.Build();
 
-// GET /api/rates?from={currency}&to={currency}&date={date}&source={source}&frequency={frequency}
-app.MapGet("/api/rates", (
+app.MapGet("/api/rates", async (
     string from,
     string to,
     DateTime date,
@@ -64,7 +58,7 @@ app.MapGet("/api/rates", (
     ExchangeRateFrequencies frequency,
     IExchangeRateRepository repository) =>
 {
-    var rate = repository.GetRate(from, to, date, source, frequency);
+    var rate = await repository.GetRateAsync(from, to, date, source, frequency);
 
     if (rate == null)
     {
@@ -101,12 +95,10 @@ namespace ExchangeRate.Api.Infrastructure
         private readonly List<ExchangeRate.Core.Entities.ExchangeRate> _exchangeRates = new();
         private readonly List<ExchangeRate.Core.Entities.PeggedCurrency> _peggedCurrencies = new();
 
-        public IQueryable<ExchangeRate.Core.Entities.ExchangeRate> ExchangeRates => _exchangeRates.AsQueryable();
-
         public Task<List<ExchangeRate.Core.Entities.ExchangeRate>> GetExchangeRatesAsync(DateTime minDate, DateTime maxDate)
         {
             var rates = _exchangeRates
-                .Where(r => r.Date.HasValue && r.Date.Value >= minDate && r.Date.Value < maxDate)
+                .Where(r => r.Date >= minDate && r.Date < maxDate)
                 .ToList();
 
             return Task.FromResult(rates);
@@ -116,16 +108,16 @@ namespace ExchangeRate.Api.Infrastructure
         {
             foreach (var rate in rates)
             {
-                var existingRate = _exchangeRates.FirstOrDefault(r =>
+                var existingIndex = _exchangeRates.FindIndex(r =>
                     r.Date == rate.Date &&
                     r.CurrencyId == rate.CurrencyId &&
                     r.Source == rate.Source &&
                     r.Frequency == rate.Frequency);
 
-                if (existingRate == null)
-                {
+                if (existingIndex >= 0)
+                    _exchangeRates[existingIndex] = rate;
+                else
                     _exchangeRates.Add(rate);
-                }
             }
 
             return Task.CompletedTask;

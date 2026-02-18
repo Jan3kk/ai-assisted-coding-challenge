@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Threading.Tasks;
 using ExchangeRate.Core.Enums;
 
 namespace ExchangeRate.Core.Interfaces
@@ -7,27 +8,27 @@ namespace ExchangeRate.Core.Interfaces
     public interface IExchangeRateRepository
     {
         /// <summary>
-        /// Returns the exchange rate from the <paramref name="fromCurrency"/> to the <paramref name="toCurrency"/> on the given <paramref name="date"/>.
-        /// It will return a previously valid rate, if the database does not contain rate for the specified <paramref name="date"/>.
-        /// It will return NULL if there is no rate at all for the <paramref name="fromCurrency"/> - <paramref name="toCurrency"/> pair.
+        /// Returns the exchange rate from <paramref name="fromCurrency"/> to <paramref name="toCurrency"/> on the given <paramref name="date"/>.
+        /// Falls back to the most recent available rate if the exact date is not available.
+        /// Returns null if no rate exists at all.
         /// </summary>
-        decimal? GetRate(CurrencyTypes fromCurrency, CurrencyTypes toCurrency, DateTime date, ExchangeRateSources source, ExchangeRateFrequencies frequency);
+        Task<decimal?> GetRateAsync(CurrencyTypes fromCurrency, CurrencyTypes toCurrency, DateTime date, ExchangeRateSources source, ExchangeRateFrequencies frequency);
 
         /// <summary>
-        /// Returns the exchange rate from the <paramref name="fromCurrencyCode"/> to the <paramref name="toCurrencyCode"/> on the given <paramref name="date"/>.
-        /// It will return a previously valid rate, if the database does not contain rate for the specified <paramref name="date"/>.
-        /// It will return NULL if there is no rate at all for the <paramref name="fromCurrencyCode"/> - <paramref name="toCurrencyCode"/> pair.
+        /// Returns the exchange rate from <paramref name="fromCurrencyCode"/> to <paramref name="toCurrencyCode"/> on the given <paramref name="date"/>.
+        /// Falls back to the most recent available rate if the exact date is not available.
+        /// Returns null if no rate exists at all.
         /// </summary>
-        decimal? GetRate(string fromCurrencyCode, string toCurrencyCode, DateTime date, ExchangeRateSources source, ExchangeRateFrequencies frequency);
+        Task<decimal?> GetRateAsync(string fromCurrencyCode, string toCurrencyCode, DateTime date, ExchangeRateSources source, ExchangeRateFrequencies frequency);
 
         /// <summary>
-        /// Updates the exhange rates for the last available day.
+        /// Updates the exchange rates for the last available day/month from all registered providers.
         /// </summary>
-        void UpdateRates();
+        Task UpdateRatesAsync();
 
         /// <summary>
         /// Ensures that the database contains all exchange rates after <paramref name="minDate"/>.
         /// </summary>
-        bool EnsureMinimumDateRange(DateTime minDate, IEnumerable<ExchangeRateSources> exchangeRateSources = null);
+        Task<bool> EnsureMinimumDateRangeAsync(DateTime minDate, IEnumerable<ExchangeRateSources>? exchangeRateSources = null);
     }
 }

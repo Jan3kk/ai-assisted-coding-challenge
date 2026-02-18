@@ -130,30 +130,26 @@ namespace ExchangeRate.Core.Providers
         private IEnumerable<ExchangeRateEntity> GetExchangeRates(ExchangeRates exchangeRates, ExchangeRateSources source, ExchangeRateFrequencies frequency)
         {
             return exchangeRates.Rates.SelectMany(
-                pair => pair.Value.Select(
-                    innerPair =>
+                pair => pair.Value
+                    .Where(innerPair => CurrencyMapping.ContainsKey(innerPair.Key))
+                    .Select(innerPair =>
                     {
-                        ExchangeRateEntity exchangeRate;
                         try
                         {
-                            exchangeRate = new ExchangeRateEntity
+                            return new ExchangeRateEntity
                             {
                                 Date = pair.Key,
                                 Frequency = frequency,
                                 Rate = innerPair.Value.GetAbsoluteRate(),
-                                Source = source
+                                Source = source,
+                                CurrencyId = CurrencyMapping[innerPair.Key]
                             };
                         }
                         catch (Exception ex)
                         {
                             throw new Exception($"Failed to get the absolute rate for {innerPair.Key} {innerPair.Value} on {pair.Key}, {frequency} at {source}.", ex);
                         }
-
-                        if (CurrencyMapping.TryGetValue(innerPair.Key, out var currencyId))
-                            exchangeRate.CurrencyId = currencyId;
-
-                        return exchangeRate;
-                    }).Where(x => x.CurrencyId.HasValue));
+                    }));
         }
 
         private async Task<ExchangeRates> GetExchangeRatesAsync(string requestUri, CancellationToken cancellationToken = default)

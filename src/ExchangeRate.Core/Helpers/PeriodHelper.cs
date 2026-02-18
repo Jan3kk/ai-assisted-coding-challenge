@@ -1,11 +1,6 @@
 #nullable enable
 namespace ExchangeRate.Core.Helpers;
 
-/// <summary>
-/// Helper class for period-based date calculations used in exchange rate lookups.
-/// Simplified from Taxually.Common.Helpers.PeriodHelper - contains only methods needed for exchange rates.
-/// Original: Taxually.Common.Helpers.PeriodHelper
-/// </summary>
 public static class PeriodHelper
 {
     /// <summary>
@@ -15,17 +10,5 @@ public static class PeriodHelper
     public static DateTime GetStartOfMonth(DateTime date)
     {
         return new DateTime(date.Year, date.Month, 1);
-    }
-
-    /// <summary>
-    /// Checks whether the given date is valid within the specified validity interval.
-    /// Used to validate VAT number validity for exchange rate selection.
-    /// </summary>
-    public static bool IsValidAt(DateTime? validFrom, DateTime? validTo, DateTime date)
-    {
-        if (validFrom > validTo)
-            throw new ArgumentOutOfRangeException($"Validity interval is invalid. ValidFrom: {validFrom} ValidTo: {validTo}");
-
-        return (validFrom == null || validFrom <= date) && (validTo == null || validTo >= date.Date);
     }
 }

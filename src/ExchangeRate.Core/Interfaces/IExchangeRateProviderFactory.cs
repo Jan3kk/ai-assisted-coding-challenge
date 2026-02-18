@@ -9,7 +9,5 @@ namespace ExchangeRate.Core.Interfaces
         IExchangeRateProvider GetExchangeRateProvider(ExchangeRateSources source);
 
         IEnumerable<ExchangeRateSources> ListExchangeRateSources();
-
-        bool TryGetExchangeRateProviderByCurrency(CurrencyTypes currency, out IExchangeRateProvider provider);
     }
 }

@@ -1,17 +1,14 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Net.Http;
 using System.Threading.Tasks;
-using ExchangeRate.Core.Helpers;
 using ExchangeRate.Core.Interfaces.Providers;
 using ExchangeRate.Core.Models;
 using ExchangeRateEntity = ExchangeRate.Core.Entities.ExchangeRate;
 
 namespace ExchangeRate.Core.Providers
 {
-    /// <summary>
-    /// Base class for providers that fetch daily exchange rates.
-    /// </summary>
     public abstract class DailyExternalApiExchangeRateProvider : ExternalApiExchangeRateProvider, IDailyExchangeRateProvider
     {
         public const int MaxQueryIntervalInDays = 180;
@@ -21,26 +18,23 @@ namespace ExchangeRate.Core.Providers
         {
         }
 
-        public virtual IEnumerable<ExchangeRateEntity> GetHistoricalDailyFxRates(DateTime from, DateTime to)
+        public virtual async Task<IEnumerable<ExchangeRateEntity>> GetHistoricalDailyFxRatesAsync(DateTime from, DateTime to)
         {
             if (to < from)
                 throw new ArgumentException("to must be later than or equal to from");
 
+            var results = new List<ExchangeRateEntity>();
             foreach (var period in GetDateRange(from, to, MaxQueryIntervalInDays))
             {
-                var rates = AsyncUtil.RunSync(() => GetDailyRatesAsync(BankId, (period.StartDate, period.EndDate)));
-                foreach (var rate in rates)
-                {
-                    yield return rate;
-                }
+                var rates = await GetDailyRatesAsync(BankId, (period.StartDate, period.EndDate));
+                results.AddRange(rates);
             }
+            return results;
         }
 
-        public virtual IEnumerable<ExchangeRateEntity> GetDailyFxRates()
+        public virtual async Task<IEnumerable<ExchangeRateEntity>> GetDailyFxRatesAsync()
         {
-            // return AsyncUtil.RunSync(() => GetDailyRatesAsync(BankId));
-            // get a longer interval in case some of the previous rates were missed
-            return GetHistoricalDailyFxRates(DateTime.UtcNow.Date.AddDays(-4), DateTime.UtcNow.Date);
+            return await GetHistoricalDailyFxRatesAsync(DateTime.UtcNow.Date.AddDays(-4), DateTime.UtcNow.Date);
         }
 
         public static IEnumerable<(DateTime StartDate, DateTime EndDate)> GetDateRange(DateTime startDate, DateTime endDate, int daysChunkSize)
@@ -54,11 +48,6 @@ namespace ExchangeRate.Core.Providers
             }
 
             yield return (StartDate: startDate, EndDate: endDate);
-        }
-
-        public async Task<IEnumerable<ExchangeRateEntity>> GetLatestFxRateAsync()
-        {
-            return await GetDailyRatesAsync(BankId);
         }
     }
 }

@@ -1,12 +1,14 @@
 using System;
 using System.Collections.Generic;
+using System.Threading.Tasks;
 using ExchangeRateEntity = ExchangeRate.Core.Entities.ExchangeRate;
 
 namespace ExchangeRate.Core.Interfaces.Providers
 {
     public interface IBiWeeklyExchangeRateProvider : IExchangeRateProvider
     {
-        IEnumerable<ExchangeRateEntity> GetBiWeeklyFxRates();
-        IEnumerable<ExchangeRateEntity> GetHistoricalBiWeeklyFxRates(DateTime from, DateTime to);
+        Task<IEnumerable<ExchangeRateEntity>> GetBiWeeklyFxRatesAsync();
+
+        Task<IEnumerable<ExchangeRateEntity>> GetHistoricalBiWeeklyFxRatesAsync(DateTime from, DateTime to);
     }
 }

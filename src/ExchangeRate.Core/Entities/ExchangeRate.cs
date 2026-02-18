@@ -5,23 +5,17 @@ namespace ExchangeRate.Core.Entities;
 
 public record ExchangeRate
 {
-    public DateTime? Date { get; set; }
+    public required DateTime Date { get; init; }
 
-    public CurrencyTypes? CurrencyId { get; set; }
+    public required CurrencyTypes CurrencyId { get; init; }
 
-    public ExchangeRateSources? Source { get; set; }
+    public required ExchangeRateSources Source { get; init; }
 
-    public ExchangeRateFrequencies? Frequency { get; set; }
+    public required ExchangeRateFrequencies Frequency { get; init; }
 
-    /// <summary>
-    /// The exchange rate of the currency on the given day. It is stored with 5 decimal precision.
-    /// </summary>
-    public decimal? Rate { get; set; }
+    public required decimal Rate { get; set; }
 
-    public override string ToString()
-    {
-        return $"{CurrencyId} - {Date:yyyy-MM-dd}: {Rate}";
-    }
+    public override string ToString() => $"{CurrencyId} - {Date:yyyy-MM-dd}: {Rate}";
 
     public const int Precision = 10;
 }

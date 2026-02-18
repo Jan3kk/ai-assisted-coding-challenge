@@ -7,10 +7,8 @@ namespace ExchangeRate.Core.Interfaces.Providers
 {
     public interface IDailyExchangeRateProvider : IExchangeRateProvider
     {
-        IEnumerable<ExchangeRateEntity> GetDailyFxRates();
+        Task<IEnumerable<ExchangeRateEntity>> GetDailyFxRatesAsync();
 
-        IEnumerable<ExchangeRateEntity> GetHistoricalDailyFxRates(DateTime from, DateTime to);
-
-        Task<IEnumerable<ExchangeRateEntity>> GetLatestFxRateAsync();
+        Task<IEnumerable<ExchangeRateEntity>> GetHistoricalDailyFxRatesAsync(DateTime from, DateTime to);
     }
 }
