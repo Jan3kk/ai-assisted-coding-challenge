@@ -445,3 +445,4 @@ log-*.txt
 # Interview internal docs
 EXPERT_SOLUTION.md
 INTERVIEWER_GUIDE.md
+/src/ExchangeRate.Api/Properties/launchSettings.json
