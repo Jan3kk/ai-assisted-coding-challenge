@@ -985,10 +985,10 @@ public class ExchangeRateIntegrationTests : IDisposable
     }
 
     /// <summary>
-    /// Tests that very old date with no available data returns an error response.
-    /// NOTE: The exact response code depends on implementation - could be 404 or 500.
+    /// Tests that a very old date with no available data returns 404.
+    /// The repository fetches the empty date range, finds nothing, and the endpoint returns 404.
     /// </summary>
-    [Fact(Skip = "Response varies by implementation - enable after implementing proper error handling")]
+    [Fact]
     public async Task GetRate_VeryOldDateNoData_ReturnsNotFound()
     {
         // Arrange
